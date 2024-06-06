@@ -1,0 +1,39 @@
+.panel {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid black;
+    padding: 5px 5px;
+}
+
+h1 {
+    margin: 0px;
+    text-align: center;
+}
+h2 {
+    margin: 0px 0px;
+}
+
+.large-text-box {
+    height: 200px;
+    resize: none;
+}
+
+body {
+    font-family: monospace;
+}
+
+label {
+    font-weight: bold;
+    padding: 5px 0px
+}
+
+input {
+    padding: 5px;
+}
+textarea {
+    padding: 5px;
+}
+button {
+    margin: 2px 0px;
+    padding: 5px;
+}

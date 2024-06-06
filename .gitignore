@@ -1,0 +1,9 @@
+# .gitignore
+
+## ignore python cache files
+*.pyc
+__pycache__/
+.venv/
+
+# ignore log files
+*.log
