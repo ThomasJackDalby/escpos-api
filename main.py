@@ -17,12 +17,22 @@ COMMAND_CUT = "cut"
 COMMAND_FEED = "feed"
 COMMAND_BARCODE = "barcode"
 
+DEFAULT_PRINTER_BAUDRATE = 19200
+DEFAULT_PRINTER_RATELIMIT = 5000
+
+PRINTER_BAUDRATE = DEFAULT_PRINTER_BAUDRATE
+PRINTER_RATELIMIT = DEFAULT_PRINTER_RATELIMIT
+
 # load config
 config = configparser.ConfigParser()
 config["printer"] = {}
 config.read(CONFIG_FILE_NAME)
 PRINTER_BAUDRATE = config["printer"]["baudrate"]
+if "printer" in config:
+    if "baudrate" in config["printer"]: PRINTER_BAUDRATE = config["printer"]["baudrate"]
+    if "ratelimit" in config["printer"]: PRINTER_RATELIMIT = config["printer"]["ratelimit"]
 
+# REST API models
 class Style(BaseModel):
     double_height: bool | None = False
     double_width: bool | None = False
@@ -39,18 +49,20 @@ class PrintJob(BaseModel):
     styles: list[Style] | None = None
     commands: list[Command] | None = None
 
-def print_error_message(e: Exception):
-    p.textln("------------")
-    p.textln("!! ERROR !!")
-    p.textln(e.message)
-    p.textln("------------")
-
 def get_printer():
+    # works on linux
     for file_name in os.listdir("/dev"):
         if file_name.startswith("ttyUSB"):
             file_path = f"/dev/{file_name}"
             return Serial(file_path, baudrate=PRINTER_BAUDRATE)
     return None
+
+def print_error_message(e: Exception):
+    p = get_printer()
+    p.textln("------------")
+    p.textln("!! ERROR !!")
+    p.textln(e.message)
+    p.textln("------------")
 
 # define api
 app = FastAPI()
@@ -62,9 +74,9 @@ def get_root():
 @app.post("/api/print")
 def post_job(job: PrintJob):
     p = get_printer()
-    if p is None: raise HTTPException(status_code=500, detail="The printer has smegged itself again...") 
+    if p is None:
+        raise HTTPException(status_code=500, detail="Unable to connect to the printer.") 
 
-    # last_was_cut = False
     try:
         style_index = -1
         for command in job.commands:
@@ -78,14 +90,13 @@ def post_job(job: PrintJob):
                         double_width=style.double_width,
                         bold=style.bold,
                         underline=style.underline)
-                p.textln(command.content[:5000])
+                p.textln(command.content[:PRINTER_RATELIMIT])
             elif command.type == COMMAND_FEED: 
                 p.feed(5)
             elif command.type == COMMAND_CUT:
                 p.cut()
             elif command.type == COMMAND_BARCODE:
                 p.barcode(command.content, "UPC-A")
-        last_was_cut = command.type == COMMAND_CUT
             
     except Exception as e:
         print("Uh oh, had an error")
@@ -98,7 +109,7 @@ app.mount("/", StaticFiles(directory="static", html=True), name="static")
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
 	exc_str = f'{exc}'.replace('\n', ' ').replace('   ', ' ')
 	logging.error(f"{request}: {exc_str}")
-	content = {'status_code': 10422, 'message': exc_str, 'data': None}
+	content = {'status_code': 422, 'message': exc_str, 'data': None}
 	return JSONResponse(content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-logger.info("Initialised the API!")
+logger.info("API Initialised.")
